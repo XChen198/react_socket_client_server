@@ -62,24 +62,33 @@ io.on('connection', (socket) => {
         users.push(data)
     })
 
-    socket.on('joinRoom', async (data) => {
+    socket.on('joinRoom', async (data, callback) => {
         const { myemail, email } = data;
         const { username, avatar } = await checkEmail(myemail)
-        // 创建房间名
-        const roomName = generateRoomName(myemail, email);
-        // 加入房间
-        socket.join(roomName);
-        // 将房间名存储到当前活跃的房间列表中
-        if (!activeRooms[roomName]) {
-            activeRooms[roomName] = { users: [] };
-        }
-        // 检查是否已经存在相同的邮箱
-        if (!activeRooms[roomName].users.includes(myemail)) {
-            activeRooms[roomName].users.push(myemail);
-        }
-        socket.on('sendMsg', (data) => {
-            socket.to(roomName).emit('receiveMsg', { data: data, username: username, avatar: avatar });
+        checkEmail(myemail).then(({ username, avatar }) => {
+            // 创建房间名
+            const roomName = generateRoomName(myemail, email);
+            // 加入房间
+            socket.join(roomName);
+            // 将房间名存储到当前活跃的房间列表中
+            if (!activeRooms[roomName]) {
+                activeRooms[roomName] = { users: [] };
+            }
+            // 检查是否已经存在相同的邮箱
+            if (!activeRooms[roomName].users.includes(myemail)) {
+                activeRooms[roomName].users.push(myemail);
+            }
+            if (callback) {
+                callback()
+            }
+
+            socket.on('sendMsg', (data) => {
+                socket.to(roomName).emit('receiveMsg', { data: data, username: username, avatar: avatar });
+            })
+        }).catch((err) => {
+            console.log(err);
         })
+
     })
     socket.on('leaveRoom', (data) => {
         const { myemail, email } = data
@@ -95,19 +104,24 @@ io.on('connection', (socket) => {
 
     })
 
-    socket.on('joinGroup', async (data) => {
+    socket.on('joinGroup', (data, callback) => {
         const { myemail, email } = data
-        const { username, avatar } = await checkEmail(myemail)
-        socket.join(email)
-        if (!activeRooms[email]) {
-            activeRooms[email] = { users: [] }
-        }
-        if (!activeRooms[email].users.includes(myemail)) {
-            activeRooms[email].users.push(myemail)
-        }
-        socket.on('sendMsg', (data) => {
-            socket.to(email).emit('receiveGroupMsg', { data: data, username, avatar: avatar })
+        checkEmail(myemail).then(({ username, avatar }) => {
+            socket.join(email)
+            if (!activeRooms[email]) {
+                activeRooms[email] = { users: [] }
+            }
+            if (!activeRooms[email].users.includes(myemail)) {
+                activeRooms[email].users.push(myemail)
+            }
+            if (callback) {
+                callback()
+            }
+            socket.on('sendMsg', (data) => {
+                socket.to(email).emit('receiveGroupMsg', { data: data, username, avatar: avatar })
+            })
         })
+
     })
 
     socket.on('leaveGroup', (data) => {
